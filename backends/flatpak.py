@@ -151,13 +151,17 @@ class FlatpakBackend(Backend):
         self._load_installed_cache()
         return self._installed_cache.get(package_name)
 
-    def install(self, package_name: str) -> bool:
+    def install(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Install a package using flatpak."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
-            result = subprocess.run(["flatpak", "install", "-y", "flathub", package_name])
+            cmd = ["flatpak", "install", "-y", "flathub"] + extra_args + [package_name]
+            result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
             return False

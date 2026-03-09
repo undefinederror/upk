@@ -146,13 +146,17 @@ class PacstallBackend(Backend):
         self._load_installed_cache()
         return self._installed_cache.get(package_name)
 
-    def install(self, package_name: str) -> bool:
+    def install(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Install a package using pacstall."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
-            result = subprocess.run(["sudo", "pacstall", "-I", package_name, "-P"])
+            cmd = ["sudo", "pacstall", "-I"] + extra_args + [package_name, "-P"]
+            result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
             return False

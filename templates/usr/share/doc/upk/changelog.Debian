@@ -1,0 +1,7 @@
+upk (0.1.0-1) unstable; urgency=medium
+
+  * Initial release of UPK - Ubuntu Package Kit
+  * Added support for APT, Snap, Flatpak, Pacstall, and AppImage backends
+  * Implemented unified search and package management interface
+
+ -- undefinederror <github@object.ninja>  $(date -R)

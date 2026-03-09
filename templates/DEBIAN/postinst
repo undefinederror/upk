@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+echo "Setting up UPK..."
+
+# Ensure the executable is executable
+chmod +x /usr/bin/upk
+
+echo "UPK installation complete!"
+echo ""
+echo "You can now run UPK with:"
+echo "  upk --help"

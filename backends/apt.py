@@ -109,9 +109,9 @@ class AptBackend(Backend):
     def _load_installed_cache(self) -> None:
         """Load all installed packages into cache."""
         try:
-            # dpkg-query -W -f='${Package} ${Version}\n'
+            # dpkg-query -W -f='${db:Status-Status} ${Package} ${Version}\n'
             result = subprocess.run(
-                ["dpkg-query", "-W", "-f=${Package} ${Version}\n"],
+                ["dpkg-query", "-W", "-f=${db:Status-Status} ${Package} ${Version}\n"],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -120,8 +120,10 @@ class AptBackend(Backend):
             for line in result.stdout.split('\n'):
                 if line.strip():
                     parts = line.split()
-                    if len(parts) >= 2:
-                        self._installed_cache[parts[0]] = parts[1]
+                    if len(parts) >= 3:
+                        status, name, version = parts[0], parts[1], parts[2]
+                        if status == "installed":
+                            self._installed_cache[name] = version
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self._installed_cache = {}
 
@@ -133,23 +135,28 @@ class AptBackend(Backend):
         # Fallback to single command if cache not loaded
         try:
             result = subprocess.run(
-                ["dpkg-query", "-W", "-f=${Version}", package_name],
+                ["dpkg-query", "-W", "-f=${db:Status-Status} ${Version}", package_name],
                 capture_output=True,
                 text=True,
                 timeout=2
             )
             if result.returncode == 0:
-                return result.stdout.strip()
+                output = result.stdout.strip()
+                if output.startswith("installed "):
+                    return output.split(" ", 1)[1]
             return None
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return None
 
-    def install(self, package_name: str) -> bool:
+    def install(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Install a package using Nala or apt."""
+        if extra_args is None:
+            extra_args = []
+            
         if self._has_nala():
-            cmd = ["sudo", "nala", "install", package_name]
+            cmd = ["sudo", "nala", "install"] + extra_args + [package_name]
         else:
-            cmd = ["sudo", "apt", "install", package_name]
+            cmd = ["sudo", "apt", "install"] + extra_args + [package_name]
             
         try:
             result = subprocess.run(cmd)
@@ -252,3 +259,43 @@ class AptBackend(Backend):
                 installed_version=version
             ))
         return packages
+
+    def handle_local_file(self, file_path: str) -> bool:
+        """Handle installation of a local .deb file.
+        
+        Args:
+            file_path: Path to the local .deb file
+            
+        Returns:
+            True if installation is successful, False otherwise
+        """
+        import os
+        if not os.path.exists(file_path):
+            from rich.console import Console
+            Console().print(f"[red]Error: File not found: {file_path}[/red]")
+            return False
+            
+        if not file_path.lower().endswith('.deb'):
+            from rich.console import Console
+            Console().print(f"[red]Error: Not a .deb file: {file_path}[/red]")
+            return False
+            
+        # Try with Nala first if available
+        if self._has_nala():
+            cmd = ["sudo", "nala", "install", file_path]
+        else:
+            # Fall back to dpkg
+            cmd = ["sudo", "dpkg", "-i", file_path]
+        
+        try:
+            result = subprocess.run(cmd)
+            if result.returncode == 0:
+                # Run apt --fix-broken-install to handle dependencies
+                fix_cmd = ["sudo", "apt", "--fix-broken", "install", "-y"]
+                fix_result = subprocess.run(fix_cmd)
+                return fix_result.returncode == 0
+            return False
+        except KeyboardInterrupt:
+            return False
+        except Exception:
+            return False

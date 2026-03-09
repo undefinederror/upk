@@ -60,12 +60,13 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def install(self, package_name: str) -> bool:
+    def install(self, package_name: str, extra_args: List[str] = None) -> bool:
         """
         Install a package.
         
         Args:
             package_name: Name of the package to install
+            extra_args: Optional list of extra arguments to pass to the backend
             
         Returns:
             True if installation is successful, False otherwise

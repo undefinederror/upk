@@ -1,0 +1,22 @@
+Package: upk
+Version: VERSION_PLACEHOLDER-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: python3 (>= 3.10), python3-click (>= 8.1.0), python3-rich (>= 13.0.0)
+Recommends: apt, snapd, flatpak, pacstall, appimage
+Maintainer: undefinederror <github@object.ninja>
+Description: Ubuntu Package Kit - Universal package manager wrapper
+ UPK is a unified CLI for managing packages across multiple package managers
+ on Ubuntu systems. It provides a single interface to search, install, update,
+ and remove packages from APT, Snap, Flatpak, Pacstall, and AppImage sources.
+ .
+ Features:
+  - Search packages across all configured backends
+  - Install packages with interactive source selection
+  - Install local files (.deb, .AppImage)
+  - Install remote files from URLs
+  - Update package lists and upgrade packages
+  - Remove packages with automatic source detection
+  - List installed packages with filtering
+  - Configuration system for customizing behavior

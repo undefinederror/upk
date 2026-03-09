@@ -2,7 +2,7 @@
 name = "upk"
 version = "0.1.0"
 description = "Ubuntu Package Kit - Universal package manager wrapper"
-authors = [{name = "Your Name"}]
+authors = [{name = "undefinederror"}]
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.1.0",

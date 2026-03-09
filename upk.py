@@ -56,6 +56,22 @@ def get_configured_backends(source: str = None) -> list:
     return available
 
 
+def get_backend_from_name(backend_name: str):
+    """Get the backend instance by name from a list of backends.
+    
+    Args:
+        backend_name: Name of the backend to find
+        
+    Returns:
+        Backend instance with the given name, or None if not found
+    """
+    available_backends = get_configured_backends()
+    for backend in available_backends:
+        if backend.name == backend_name:
+            return backend
+    return None
+
+
 @cli.command()
 @click.argument('query')
 @click.option('-e', '--exact', is_flag=True, help='Show only exact matches')
@@ -109,54 +125,44 @@ def search(query: str, exact: bool):
     display_search_results(results)
 
 
-@cli.command()
-@click.argument('package')
-@click.option('--source', type=click.Choice(['apt', 'snap', 'flatpak', 'pacstall']), help='Specify which package manager to use')
-@click.option('-e', '--exact', is_flag=True, help='Show only exact matches')
-def install(package: str, source: str, exact: bool):
-    """Install a package with optional source selection.
+def install_package(package_name: str, exact: bool = False, extra_args: list = None) -> bool:
+    """Install a package by name from available sources.
     
-    Example:
-        upk install firefox
-        upk install firefox --source snap
+    Args:
+        package_name: Name of the package to install
+        exact: If True, only show exact matches
+        extra_args: Optional list of extra arguments to pass to the backend
+        
+    Returns:
+        True if installation was successful, False otherwise
     """
     from rich.prompt import Prompt
     from rich.console import Console
     console = Console()
     
+    if extra_args is None:
+        extra_args = []
+    
     available_backends = get_configured_backends()
     
     if not available_backends:
-        click.echo("Error: No package managers available!", err=True)
-        return
-        
-    if source:
-        target_backend = next((b for b in available_backends if b.name == source), None)
-        if not target_backend:
-            click.echo(f"Error: Source '{source}' is not available.", err=True)
-            return
-            
-        console.print(f"Installing [bold cyan]{package}[/bold cyan] using [bold blue]{source}[/bold blue]...")
-        success = target_backend.install(package)
-        if success:
-            console.print(f"[green]Successfully installed {package}.[/green]")
-        else:
-            console.print(f"[red]Failed to install {package}.[/red]")
-        return
-        
+        console.print("[red]Error: No package managers available![/red]")
+        return False
+    
     # Search for matching packages to offer a prompt
-    console.print(f"Searching for [bold cyan]{package}[/bold cyan] across available sources...")
+    console.print(f"Searching for [bold cyan]{package_name}[/bold cyan] across available sources...")
     
     from search import search_all_backends
-    results = search_all_backends(available_backends, package)
+    results = search_all_backends(available_backends, package_name)
     
+    # Filter for exact matches if requested
     if exact:
-        results = [pkg for pkg in results if pkg.name == package]
+        results = [pkg for pkg in results if pkg.name == package_name]
     
     sorted_results = display_search_results(results, show_numbers=True)
     
     if not sorted_results:
-        return
+        return False
         
     choice = Prompt.ask(
         "Enter the number of the package to install (or 'q' to cancel)",
@@ -166,26 +172,155 @@ def install(package: str, source: str, exact: bool):
     
     if choice.lower() == 'q':
         console.print("Installation cancelled.")
-        return
+        return False
         
     selected_pkg = sorted_results[int(choice) - 1]
     
-    target_backend = next((b for b in available_backends if b.name == selected_pkg.source), None)
+    target_backend = get_backend_from_name(selected_pkg.source)
     if not target_backend:
-        click.echo(f"Error: Selected source '{selected_pkg.source}' is not available.", err=True)
-        return
+        console.print(f"[red]Error: Selected source '{selected_pkg.source}' is not available.[/red]")
+        return False
         
     console.print(f"Installing [bold cyan]{selected_pkg.name}[/bold cyan] using [bold blue]{selected_pkg.source}[/bold blue]...")
-    success = target_backend.install(selected_pkg.name)
+    success = target_backend.install(selected_pkg.name, extra_args=extra_args)
     if success:
         console.print(f"[green]Successfully installed {selected_pkg.name}.[/green]")
     else:
         console.print(f"[red]Failed to install {selected_pkg.name}.[/red]")
+    return success
+
+
+def install_local_file(file_path: str, extra_args: list = None) -> bool:
+    """Install a local file by determining its type and routing to appropriate backend.
+    
+    Args:
+        file_path: Path to the local file to install
+        extra_args: Optional list of extra arguments to pass to the backend
+        
+    Returns:
+        True if installation was successful, False otherwise
+    """
+    from rich.console import Console
+    console = Console()
+    
+    if extra_args is None:
+        extra_args = []
+    
+    import os
+    from utils import detect_file_type, get_appimages_dir
+    
+    absolute_path = os.path.abspath(file_path)
+    detected_source = detect_file_type(absolute_path)
+        
+    if not detected_source:
+        console.print(f"[red]✗ Unknown file type for: {absolute_path}[/red]")
+        return False
+    
+    target_backend = get_backend_from_name(detected_source)
+    if not target_backend:
+        console.print(f"[red]✗ No available backend for {detected_source} files[/red]")
+        return False
+    
+    console.print(f"[bold blue]Routing to {detected_source} backend...[/bold blue]")
+    
+    # Pass the file path to the backend's handle_local_file method
+    if hasattr(target_backend, 'handle_local_file'):
+        success = target_backend.handle_local_file(absolute_path)
+    else:
+        success = target_backend.install(absolute_path, extra_args=extra_args)
+        
+    if success:
+        console.print(f"[green]Successfully installed {file_path}.[/green]")
+    else:
+        console.print(f"[red]Failed to install {file_path}.[/red]")
+    return success
+
+
+def install_remote_file(url: str, extra_args: list = None) -> bool:
+    """Install a remote file by downloading it first, then installing the local file.
+    
+    Args:
+        url: URL of the remote file to download and install
+        extra_args: Optional list of extra arguments to pass to the backend
+        
+    Returns:
+        True if installation was successful, False otherwise
+    """
+    from rich.console import Console
+    console = Console()
+    
+    if extra_args is None:
+        extra_args = []
+    
+    from utils import download_remote_file, cleanup_downloads
+    
+    # 1. Download the file
+    downloaded_file = download_remote_file(url)
+    if not downloaded_file:
+        console.print(f"[red]Failed to download {url}.[/red]")
+        return False
+        
+    try:
+        # 2. Install the downloaded file
+        success = install_local_file(downloaded_file, extra_args=extra_args)
+        return success
+        
+    finally:
+        # Clean up downloads directory
+        cleanup_downloads()
 
 
 @cli.command()
-@click.option('--source', type=click.Choice(['apt', 'snap', 'flatpak', 'pacstall']), help='Specify which package manager to use')
-def update(source: str):
+@click.argument('package')
+@click.option('-e', '--exact', is_flag=True, help='Show only exact matches')
+@click.argument('extra_args', nargs=-1)
+def install(package: str, exact: bool, extra_args: tuple):
+    """Install a package, local file, or remote file.
+    
+    The install command automatically determines the type of input:
+    - Package name (e.g., 'firefox') → Searches available sources
+    - Local file path (e.g., './app.deb') → Installs the local file
+    - Remote URL (e.g., 'https://example.com/app.deb') → Downloads and installs
+    
+    Extra arguments are passed to the backend (e.g., --classic for snap).
+    
+    Example:
+        upk install firefox
+        upk install ./myapp.deb
+        upk install https://example.com/myapp.deb
+        upk install fresh-editor --classic
+    """
+    from rich.console import Console
+    console = Console()
+    
+    import os
+    from urllib.parse import urlparse
+    from utils import is_local_file
+    
+    # Convert extra_args tuple to list
+    extra = list(extra_args)
+    
+    # Determine what type of install this is
+    parsed_url = urlparse(package)
+    
+    if parsed_url.scheme in ('http', 'https'):
+        # Remote file
+        console.print(f"Installing remote file: [bold cyan]{package}[/bold cyan]")
+        success = install_remote_file(package, exact=exact, extra_args=extra)
+    elif is_local_file(package):
+        # Local file
+        console.print(f"Installing local file: [bold cyan]{package}[/bold cyan]")
+        success = install_local_file(package, exact=exact, extra_args=extra)
+    else:
+        # Package name
+        console.print(f"Installing package: [bold cyan]{package}[/bold cyan]")
+        success = install_package(package, exact=exact, extra_args=extra)
+    
+    return success
+
+
+@cli.command()
+def update():
     """Update package lists and repositories.
     
     Updates the local system's cache of available packages.
@@ -193,7 +328,7 @@ def update(source: str):
     from rich.console import Console
     console = Console()
     
-    available_backends = get_configured_backends(source)
+    available_backends = get_configured_backends()
         
     for backend in available_backends:
         console.print(f"Updating package lists for [bold blue]{backend.name}[/bold blue]...")
@@ -206,8 +341,7 @@ def update(source: str):
 
 @cli.command()
 @click.argument('package', required=False)
-@click.option('--source', type=click.Choice(['apt', 'snap', 'flatpak', 'pacstall']), help='Specify which package manager to use')
-def upgrade(package: str, source: str):
+def upgrade(package: str):
     """Upgrade all packages or a specific package.
     
     If no package is specified, upgrades all installed packages system-wide.
@@ -216,7 +350,7 @@ def upgrade(package: str, source: str):
     from rich.console import Console
     console = Console()
     
-    available_backends = get_configured_backends(source)
+    available_backends = get_configured_backends()
         
     if package:
         console.print(f"Checking where [bold cyan]{package}[/bold cyan] is installed...")
@@ -242,41 +376,33 @@ def upgrade(package: str, source: str):
 
 @cli.command()
 @click.argument('package')
-@click.option('--source', type=click.Choice(['apt', 'snap', 'flatpak', 'pacstall']), help='Specify which package manager to use')
-def remove(package: str, source: str):
-    """Remove a package with optional source selection."""
+def remove(package: str):
+    """Remove a package."""
     from rich.prompt import Prompt
     from rich.console import Console
     console = Console()
     
     available_backends = get_configured_backends()
-    
-    if source:
-        target_backend = next((b for b in available_backends if b.name == source), None)
-        if not target_backend:
-            click.echo(f"Error: Source '{source}' is not available.", err=True)
-            return
-            
-        console.print(f"Removing [bold cyan]{package}[/bold cyan] using [bold blue]{source}[/bold blue]...")
-        success = target_backend.remove(package)
-        if success:
-            console.print(f"[green]Successfully removed {package}.[/green]")
-        else:
-            console.print(f"[red]Failed to remove {package}.[/red]")
-        return
         
-    console.print(f"Searching for [bold cyan]{package}[/bold cyan] across available sources...")
-    from search import search_all_backends
-    results = search_all_backends(available_backends, package)
-    results = [pkg for pkg in results if pkg.name == package and pkg.is_installed]
+    console.print(f"Searching for [bold cyan]{package}[/bold cyan] among installed packages...")
+    from search import list_all_backends
+    results = list_all_backends(available_backends)
+    
+    # Check for exact case-insensitive match first
+    exact_results = [pkg for pkg in results if pkg.name.lower() == package.lower()]
+    if exact_results:
+        results = exact_results
+    else:
+        # Fallback to substring match
+        results = [pkg for pkg in results if package.lower() in pkg.name.lower()]
     
     if not results:
-        console.print(f"[yellow]No installed exact match for '{package}' found.[/yellow]")
+        console.print(f"[yellow]No installed match for '{package}' found.[/yellow]")
         return
         
     if len(results) == 1:
-        chosen_source = results[0].source
-        console.print(f"Found installed in {chosen_source}, removing...")
+        chosen_pkg = results[0]
+        console.print(f"Found installed in {chosen_pkg.source}, removing...")
     else:
         from display import display_search_results
         sorted_results = display_search_results(results, show_numbers=True)
@@ -288,12 +414,12 @@ def remove(package: str, source: str):
         if choice.lower() == 'q':
             console.print("Removal cancelled.")
             return
-        chosen_source = sorted_results[int(choice) - 1].source
+        chosen_pkg = sorted_results[int(choice) - 1]
         
-    target_backend = next((b for b in available_backends if b.name == chosen_source), None)
-    success = target_backend.remove(package)
+    target_backend = get_backend_from_name(chosen_pkg.source)
+    success = target_backend.remove(chosen_pkg.name)
     if success:
-        console.print(f"[green]Successfully removed {package}.[/green]")
+        console.print(f"[green]Successfully removed {chosen_pkg.name}.[/green]")
     else:
         console.print(f"[red]Failed to remove {package}.[/red]")
 

@@ -1,2 +1,3 @@
 upk.code-workspace
 __pycache__
+*.deb

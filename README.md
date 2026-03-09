@@ -19,13 +19,15 @@ Enter the number of the package to install (or 'q' to cancel):
 
 ## Features
 
-- 🔍 **Search packages** across all configured backends
-- ⬇️ **Install packages** with source selection
+- 🔍 **Search packages** across all configured backends with live progress
+- ⬇️ **Install packages** with interactive source selection
+- 📦 **Install local files** - supports `.deb` and `.AppImage` files
+- 🌐 **Install remote files** - download and install from URLs
 - 🔄 **Update package lists** and upgrade packages
 - 🗑️ **Remove packages** with automatic source detection
-- ⚙️ **Configuration system** for customizing behavior
 - 📋 **List installed packages** with filtering options
-
+- ⚙️ **Configuration system** for customizing behavior
+- 🎯 **Exact match searching** to find specific packages
 
 ## Available Backends
 
@@ -35,7 +37,7 @@ Enter the number of the package to install (or 'q' to cancel):
 | Snap       | `snap`              | Yes               | Canonical's package system |
 | Flatpak    | `flatpak`           | Yes               | Cross-distro package format |
 | Pacstall   | `pacstall`          | Yes               | AUR-like package manager |
-| AppImage   | N/A                 | Yes               | Portable application format |
+| AppImage   | `am`                | Yes               | [Application Manager](https://github.com/ivan-hc/AM) by ivan-hc |
 
 **Note**: Backends are automatically disabled if their required command isn't found.
 
@@ -44,17 +46,10 @@ Enter the number of the package to install (or 'q' to cancel):
 ### Prerequisites
 - Python 3.10+
 - Ubuntu-based system
-- Recommended: [Nala](https://gitlab.com/volian/nala) (`sudo apt install nala`)
+- Optional: [Nala](https://gitlab.com/volian/nala) (`sudo apt install nala`) for faster APT operations
 
 ### Install UPK
-```bash
-git clone https://github.com/undefinederror/upk
-cd upk
-pip install -e .
-# optional but recommended
-# add an alias in your ~/.bash_aliases
-alias upk='python3 /path/to/upk/upk.py'
-
+Grab the .deb file from [releases](https://github.com/undefinederror/upk/releases)
 ```
 
 ## Configuration
@@ -70,9 +65,26 @@ upk config set disabled_backends '["snap"]'
 # Enable exact match searching
 upk config set always_exact_search true
 
+# Disable interactive prompts
+upk config set interactive_prompts false
+
 # List all configurations
 upk config list
+
+# Get a specific config value
+upk config get backends_priority
 ```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `backends_priority` | list | `["apt", "flatpak", "snap", "pacstall"]` | Order to prioritize backends in search results |
+| `disabled_backends` | list | `[]` | List of backends to disable |
+| `always_exact_search` | bool | `false` | Only show exact matches in search |
+| `interactive_prompts` | bool | `true` | Enable interactive prompts for package selection |
+| `path_downloads` | string | `~/.local/share/upk/downloads` | Directory for downloaded files |
+| `path_appimages` | string | `~/.local/share/applications/AppImages` | Directory for AppImages |
 
 ## Usage Examples
 
@@ -80,14 +92,27 @@ upk config list
 # Search for packages
 upk search firefox
 
-# Search for packages, exact match
+# Search for packages, exact match only
 upk search firefox -e
 
-# Install Firefox, follow prompt and choose source
+# Install Firefox (prompts to choose source)
 upk install firefox
 
-# Install Firefox via specific backend
-upk install firefox --source flatpak
+# Install Firefox, exact match only
+upk install firefox -e
+
+# Install Firefox with extra args for backend (e.g., --classic for snap)
+# Use -- to separate extra_args from options
+upk install firefox -- --classic
+
+# Install a local .deb file
+upk install ./my-package.deb
+
+# Install a local .AppImage file
+upk install ./my-app.AppImage
+
+# Install a remote file from URL
+upk install https://example.com/my-app.AppImage
 
 # Update package lists
 upk update
@@ -101,10 +126,15 @@ upk upgrade firefox
 # Remove package
 upk remove firefox
 
-# List installed packages
+# List all installed packages
 upk list
-```
 
+# List installed packages with filter
+upk list firefox
+
+# List installed packages, exact match
+upk list firefox -e
+```
 
 ## License
 

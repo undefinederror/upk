@@ -131,13 +131,18 @@ class SnapBackend(Backend):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             return None
 
-    def install(self, package_name: str) -> bool:
+    def install(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Install a package using snap."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
-            result = subprocess.run(["sudo", "snap", "install", package_name])
+            # extra_args go BEFORE the package name for snap
+            cmd = ["sudo", "snap", "install"] + extra_args + [package_name]
+            result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
             return False

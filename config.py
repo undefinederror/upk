@@ -10,7 +10,9 @@ DEFAULT_CONFIG = {
     "backends_priority": ["apt", "flatpak", "snap", "pacstall"],
     "disabled_backends": [],
     "always_exact_search": False,
-    "interactive_prompts": True
+    "interactive_prompts": True,
+    "path_downloads": "~/.local/share/upk/downloads",
+    "path_appimages": "~/.local/share/applications/AppImages",
 }
 
 def load_config() -> Dict[str, Any]:
