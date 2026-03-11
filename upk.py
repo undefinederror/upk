@@ -306,11 +306,11 @@ def install(package: str, exact: bool, extra_args: tuple):
     if parsed_url.scheme in ('http', 'https'):
         # Remote file
         console.print(f"Installing remote file: [bold cyan]{package}[/bold cyan]")
-        success = install_remote_file(package, exact=exact, extra_args=extra)
+        success = install_remote_file(package, extra_args=extra)
     elif is_local_file(package):
         # Local file
         console.print(f"Installing local file: [bold cyan]{package}[/bold cyan]")
-        success = install_local_file(package, exact=exact, extra_args=extra)
+        success = install_local_file(package, extra_args=extra)
     else:
         # Package name
         console.print(f"Installing package: [bold cyan]{package}[/bold cyan]")
