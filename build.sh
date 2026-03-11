@@ -53,6 +53,7 @@ cp display.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
 cp search.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
 cp utils.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
 cp upk.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
+cp VERSION "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
 
 # Create wrapper script
 print_status "Creating wrapper script..."

@@ -8,8 +8,21 @@ from display import display_search_results
 from search import search_all_backends
 
 
-@click.group()
-@click.version_option(version="0.1.0")
+import os
+
+def get_version():
+    """Read version from VERSION file."""
+    try:
+        version_file = os.path.join(os.path.dirname(__file__), 'VERSION')
+        if os.path.exists(version_file):
+            with open(version_file, 'r') as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    return "0.1.0"
+
+@click.group(context_settings=dict(help_option_names=['-h', '--help']), name="upk")
+@click.version_option(get_version(), '-v', '--version', message="upk version %(version)s")
 def cli():
     """UPK - Ubuntu Package Kit
     
@@ -306,11 +319,11 @@ def install(package: str, exact: bool, extra_args: tuple):
     if parsed_url.scheme in ('http', 'https'):
         # Remote file
         console.print(f"Installing remote file: [bold cyan]{package}[/bold cyan]")
-        success = install_remote_file(package, exact=exact, extra_args=extra)
+        success = install_remote_file(package, extra_args=extra)
     elif is_local_file(package):
         # Local file
         console.print(f"Installing local file: [bold cyan]{package}[/bold cyan]")
-        success = install_local_file(package, exact=exact, extra_args=extra)
+        success = install_local_file(package, extra_args=extra)
     else:
         # Package name
         console.print(f"Installing package: [bold cyan]{package}[/bold cyan]")
@@ -538,4 +551,4 @@ def config(action: str, key: str, value: str):
 
 
 if __name__ == "__main__":
-    cli()
+    cli(prog_name="upk")
