@@ -19,7 +19,7 @@ def get_version():
                 return f.read().strip()
     except Exception:
         pass
-    return "0.1.0"
+    return "1.1.0"
 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']), name="upk")
 @click.version_option(get_version(), '-v', '--version', message="upk version %(version)s")
