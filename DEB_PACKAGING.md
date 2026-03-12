@@ -50,6 +50,8 @@ The packaging process creates a Python package and packages it into a DEB file t
 The resulting DEB package includes:
 
 - **Executable**: `/usr/bin/upk` - The main UPK application
+- **Shell Completion**: `/usr/share/bash-completion/completions/upk` - Automatic Bash autocomplete
+- **Managed AppImages**: Stored in the location defined by `path_appimages` (default `~/.local/share/applications/AppImages`)
 - **Documentation**: `/usr/share/doc/upk/` - Package documentation and license
 - **Post-installation script**: Handles setup tasks after installation
 

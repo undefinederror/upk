@@ -42,15 +42,14 @@ Enter the number of the package to install (or 'q' to cancel):
 **Note**: Backends are automatically disabled if their required command isn't found.
 
 ## Installation
+Grab the .deb file from [releases](https://github.com/undefinederror/upk/releases). The `.deb` package automatically installs Bash completion.
+
 
 ### Prerequisites
 - Python 3.10+
 - Ubuntu-based system
 - Optional: [Nala](https://gitlab.com/volian/nala) (`sudo apt install nala`) for faster APT operations
 
-### Install UPK
-Grab the .deb file from [releases](https://github.com/undefinederror/upk/releases)
-```
 
 ## Configuration
 

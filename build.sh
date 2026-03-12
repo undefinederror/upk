@@ -67,6 +67,14 @@ EOF
 chmod +x "$TEMP_DIR/usr/bin/upk"
 print_success "Source files copied and wrapper script created"
 
+# Create bash completion
+print_status "Creating bash completion script..."
+mkdir -p "$TEMP_DIR/usr/share/bash-completion/completions"
+# Set PYTHONPATH to current directory to ensure backends can be imported
+export PYTHONPATH=$PYTHONPATH:.
+_UPK_COMPLETE=bash_source python3 upk.py > "$TEMP_DIR/usr/share/bash-completion/completions/upk"
+print_success "Bash completion script created"
+
 # Create control file from template
 print_status "Creating control file from template..."
 cp "templates/DEBIAN/control" "$TEMP_DIR/DEBIAN/control"
@@ -83,10 +91,20 @@ print_status "Creating post-removal script from template..."
 cp "templates/DEBIAN/postrm" "$TEMP_DIR/DEBIAN/postrm"
 chmod 755 "$TEMP_DIR/DEBIAN/postrm"
 
-# Create changelog from template
-print_status "Creating changelog from template..."
-cp "templates/usr/share/doc/upk/changelog.Debian" "$TEMP_DIR/usr/share/doc/upk/changelog.Debian"
+# Create changelog dynamically from CHANGELOG.md
+print_status "Generating Debian changelog from CHANGELOG.md..."
+# We take the first section of CHANGELOG.md (the latest version) and format it
+CHANGELOG_CONTENT=$(grep -Pzn '(?s)## \[\d+\.\d+\.\d+\].*?(?=\n## |$)' CHANGELOG.md | tr -d '\0' | sed '1d' | sed 's/^/  /')
 
+cat > "$TEMP_DIR/usr/share/doc/upk/changelog.Debian" << EOL
+upk ($VERSION) unstable; urgency=medium
+
+$CHANGELOG_CONTENT
+
+ -- undefinederror <github@object.ninja>  $(date -R)
+EOL
+gzip -n -9 "$TEMP_DIR/usr/share/doc/upk/changelog.Debian"
+print_success "Debian changelog generated and compressed"
 # Create copyright file from template
 print_status "Creating copyright file from template..."
 cp "templates/usr/share/doc/upk/copyright" "$TEMP_DIR/usr/share/doc/upk/copyright"
