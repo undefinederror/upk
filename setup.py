@@ -19,15 +19,22 @@ def get_requirements():
         return pyproject_data.get("project", {}).get("dependencies", [])
     return []
 
+def get_version():
+    """Read version from VERSION file."""
+    version_path = this_directory / "VERSION"
+    if version_path.exists():
+        return version_path.read_text().strip()
+    return "1.1.0"
+
 setup(
     name="upk",
-    version="0.1.0",
+    version=get_version(),
     description="Ubuntu Package Kit - Universal package manager wrapper",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="Your Name",
-    author_email="your.email@example.com",
-    url="https://github.com/yourusername/upk",
+    author="undefinederror (Lorenzo Paci)",
+    author_email="github@object.ninja",
+    url="https://github.com/undefinederror/upk",
     packages=find_packages(),
     include_package_data=True,
     install_requires=get_requirements(),

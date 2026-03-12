@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-03-12
+
+### Fixed
+- **Pipeline**: Fixed compilation on github actions.
+
 ## [1.1.0] - 2026-03-12
 
 ### Added

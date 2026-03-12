@@ -70,6 +70,14 @@ print_success "Source files copied and wrapper script created"
 # Create bash completion
 print_status "Creating bash completion script..."
 mkdir -p "$TEMP_DIR/usr/share/bash-completion/completions"
+
+# Check if required dependencies are available for completion generation
+if ! python3 -c "import click, rich" &>/dev/null; then
+    print_warning "Missing Python dependencies (click, rich) required for bash completion generation."
+    print_status "Attempting to install them..."
+    pip3 install click rich || { print_error "Failed to install dependencies. Please install 'click' and 'rich' manually."; exit 1; }
+fi
+
 # Set PYTHONPATH to current directory to ensure backends can be imported
 export PYTHONPATH=$PYTHONPATH:.
 _UPK_COMPLETE=bash_source python3 upk.py > "$TEMP_DIR/usr/share/bash-completion/completions/upk"
