@@ -34,12 +34,10 @@ class FlatpakBackend(Backend):
         if not self.is_available():
             return []
 
-        # Pre-fetch installed cache once per search
-        self._load_installed_cache()
-
+        # We no longer pre-fetch installed cache here
         try:
             result = subprocess.run(
-                ["flatpak", "search", query, "--columns=application,version"],
+                ["flatpak", "search", query, "--columns=application,version,description"],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -53,7 +51,7 @@ class FlatpakBackend(Backend):
         packages = []
         lines = output.split('\n')
         
-        # Output format is defined by --columns=application,version
+        # Output format is defined by --columns=application,version,description
         # Note: flatpak doesn't print a header if you specify columns
         # Or wait, sometimes it does. We will split by \t since --columns outputs tab-separated or space separated
         for line in lines:
@@ -63,13 +61,14 @@ class FlatpakBackend(Backend):
             if "no matches found" in line.lower():
                 continue
             
-            # Application    Version
-            # org.mozilla.firefox    121.0
+            # Application    Version    Description
+            # org.mozilla.firefox    121.0    Mozilla Firefox
             parts = line.split('\t')
             if len(parts) >= 2:
                 # Some flatpak versions use spaces instead of tabs depending on output mode
                 package_name = parts[0].strip()
                 version = parts[1].strip()
+                description = parts[2].strip() if len(parts) >= 3 else None
                 
                 # Header check just in case
                 if package_name.lower() == "application ID".lower() or package_name.lower() == "application":
@@ -82,14 +81,13 @@ class FlatpakBackend(Backend):
                 if not version:
                     version = "unknown"
                 
-                # Get installed version from cache
-                installed_version = self.get_installed_version(package_name)
                 
                 packages.append(PackageInfo(
                     name=package_name,
                     version=version,
                     source=self.name,
-                    installed_version=installed_version
+                    description=description,
+                    installed_version=None
                 ))
             else:
                 # Fallback to splitting by space if tab split didn't work
@@ -97,17 +95,18 @@ class FlatpakBackend(Backend):
                 if len(parts) >= 2:
                     package_name = parts[0]
                     version = parts[1]
+                    description = ' '.join(parts[2:]) if len(parts) > 2 else None
                     
                     if package_name.lower() == "application" or package_name.lower() == "application ID":
                         continue
                         
-                    installed_version = self.get_installed_version(package_name)
                     
                     packages.append(PackageInfo(
                         name=package_name,
                         version=version,
                         source=self.name,
-                        installed_version=installed_version
+                        description=description,
+                        installed_version=None
                     ))
         
         return packages
@@ -120,7 +119,7 @@ class FlatpakBackend(Backend):
 
         try:
             result = subprocess.run(
-                ["flatpak", "list", "--app", "--columns=application,version"],
+                ["flatpak", "list", "--app", "--columns=application,version,description"],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -132,24 +131,32 @@ class FlatpakBackend(Backend):
                     continue
                 parts = line.split('\t')
                 if len(parts) >= 2:
-                    self._installed_cache[parts[0].strip()] = parts[1].strip() or "installed"
+                    self._installed_cache[parts[0].strip()] = {
+                        "version": parts[1].strip() or "installed",
+                        "description": parts[2].strip() if len(parts) >= 3 else None
+                    }
                 else:
                     parts = line.split()
                     if len(parts) >= 2:
-                        self._installed_cache[parts[0]] = parts[1]
+                        self._installed_cache[parts[0]] = {
+                            "version": parts[1],
+                            "description": ' '.join(parts[2:]) if len(parts) > 2 else None
+                        }
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self._installed_cache = {}
 
     def get_installed_version(self, package_name: str) -> Optional[str]:
         """Get installed version using cache."""
         if self._installed_cache is not None:
-            return self._installed_cache.get(package_name)
-
+            info = self._installed_cache.get(package_name)
+            return info["version"] if info else None
+        
         if not self.is_available():
             return None
-
+            
         self._load_installed_cache()
-        return self._installed_cache.get(package_name)
+        info = self._installed_cache.get(package_name)
+        return info["version"] if info else None
 
     def install(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Install a package using flatpak."""
@@ -220,11 +227,12 @@ class FlatpakBackend(Backend):
             return []
             
         packages = []
-        for name, version in self._installed_cache.items():
+        for name, info in self._installed_cache.items():
             packages.append(PackageInfo(
                 name=name,
-                version=version,
+                version=info["version"],
                 source=self.name,
-                installed_version=version
+                description=info.get("description"),
+                installed_version=info["version"]
             ))
         return packages

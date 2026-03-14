@@ -110,9 +110,7 @@ def search(query: str, exact: bool):
     backend_status = {b.name: Spinner("dots", text="searching...", style="cyan") for b in available_backends}
     console = Console()
     
-    def update_progress(backend_name: str, success: bool):
-        """Update backend status when it completes."""
-        backend_status[backend_name] = "✓ done" if success else "✗ failed"
+
     
     def generate_status_table():
         """Generate status table for live display."""
@@ -126,16 +124,55 @@ def search(query: str, exact: bool):
         
         return table
     
+    import time
+    start_time = time.time()
+    
     # Perform search with live progress
     with Live(generate_status_table(), console=console, refresh_per_second=10) as live:
+        def update_progress(backend_name: str, success: bool):
+            """Update backend status when it completes."""
+            backend_status[backend_name] = "✓ done" if success else "✗ failed"
+            live.update(generate_status_table())
+            live.refresh()
+            
         results = search_all_backends(available_backends, query, update_progress)
         live.update(generate_status_table())
         
     if exact:
         results = [pkg for pkg in results if pkg.name == query]
+        
+    # Check installed status efficiently
+    if results:
+        backend_status_installed = {b.name: Spinner("dots", text="checking...", style="cyan") for b in available_backends}
+        
+        def generate_installed_status_table():
+            table = Table.grid(padding=(0, 2))
+            table.add_column(style="cyan", no_wrap=True)
+            table.add_column(style="dim")
+            table.add_row("Checking installed status:")
+            for backend_name, status in backend_status_installed.items():
+                table.add_row(f"  {backend_name}:", status)
+            return table
+
+        with Live(generate_installed_status_table(), console=console, transient=True, refresh_per_second=10) as live:
+            def update_installed_progress(backend_name: str, success: bool):
+                backend_status_installed[backend_name] = "✓ done" if success else "✗ failed"
+                live.update(generate_installed_status_table())
+                live.refresh()
+
+            from search import list_all_backends
+            installed_pkgs = list_all_backends(available_backends, update_installed_progress)
+            installed_dict = {(p.name, p.source): p.installed_version for p in installed_pkgs if p.installed_version}
+            
+            for pkg in results:
+                pkg.installed_version = installed_dict.get((pkg.name, pkg.source))
+                if pkg.installed_version and (pkg.version == "latest" or pkg.version == "unknown"):
+                    pkg.version = pkg.installed_version
+        
+    elapsed_ms = int((time.time() - start_time) * 1000)
     
     # Display results
-    display_search_results(results)
+    display_search_results(results, elapsed_ms=elapsed_ms)
 
 
 def install_package(package_name: str, exact: bool = False, extra_args: list = None) -> bool:
@@ -453,9 +490,6 @@ def list_pkgs(package: str, exact: bool):
     backend_status = {b.name: Spinner("dots", text="listing...", style="cyan") for b in available_backends}
     console = Console()
     
-    def update_progress(backend_name: str, success: bool):
-        backend_status[backend_name] = "✓ done" if success else "✗ failed"
-    
     def generate_status_table():
         table = Table.grid(padding=(0, 2))
         table.add_column(style="cyan", no_wrap=True)
@@ -465,7 +499,15 @@ def list_pkgs(package: str, exact: bool):
             table.add_row(f"  {backend_name}:", status)
         return table
     
+    import time
+    start_time = time.time()
+    
     with Live(generate_status_table(), console=console, refresh_per_second=10) as live:
+        def update_progress(backend_name: str, success: bool):
+            backend_status[backend_name] = "✓ done" if success else "✗ failed"
+            live.update(generate_status_table())
+            live.refresh()
+            
         results = list_all_backends(available_backends, update_progress)
         live.update(generate_status_table())
     
@@ -475,7 +517,9 @@ def list_pkgs(package: str, exact: bool):
         else:
             results = [pkg for pkg in results if package.lower() in pkg.name.lower()]
             
-    display_search_results(results)
+    elapsed_ms = int((time.time() - start_time) * 1000)
+            
+    display_search_results(results, elapsed_ms=elapsed_ms)
 
 
 @cli.command()

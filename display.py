@@ -1,6 +1,6 @@
 """Display formatting using Rich."""
 
-from typing import List
+from typing import List, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -8,7 +8,7 @@ from rich.table import Table
 from backends.base import PackageInfo
 
 
-def display_search_results(packages: List[PackageInfo], show_numbers: bool = False) -> List[PackageInfo]:
+def display_search_results(packages: List[PackageInfo], show_numbers: bool = False, elapsed_ms: Optional[int] = None) -> List[PackageInfo]:
     """
     Display search results in a formatted table.
     
@@ -30,9 +30,9 @@ def display_search_results(packages: List[PackageInfo], show_numbers: bool = Fal
     if show_numbers:
         table.add_column("#", style="dim", justify="right")
     table.add_column("Package Name", style="white", no_wrap=True)
-    table.add_column("Version", style="green")
-    table.add_column("Source", style="blue")
-    table.add_column("Installed", style="magenta")
+    table.add_column("Version", style="green", no_wrap=True)
+    table.add_column("Source", style="blue", no_wrap=True)
+    table.add_column("Description", style="dim")
     
     # Get sort order from config
     try:
@@ -54,21 +54,33 @@ def display_search_results(packages: List[PackageInfo], show_numbers: bool = Fal
     
     # Add rows
     for i, pkg in enumerate(sorted_packages):
-        installed_status = ""
+        # Format version with installed status
         if pkg.is_installed:
-            installed_status = f"{pkg.installed_version} ✓"
+            if pkg.installed_version and pkg.installed_version != pkg.version:
+                version_display = f"{pkg.version} [magenta]({pkg.installed_version} ✓)[/magenta]"
+            else:
+                version_display = f"[magenta]{pkg.version} ✓[/magenta]"
+        else:
+            version_display = pkg.version
         
         row_args = []
         if show_numbers:
             row_args.append(str(i + 1))
+        
+        desc = pkg.description or ""
+        desc_formatted = f"[dim white]{desc}[/dim white]" if i % 2 == 0 else f"[dim cyan]{desc}[/dim cyan]"
+        
         row_args.extend([
             pkg.name,
-            pkg.version,
+            version_display,
             pkg.source,
-            installed_status
+            desc_formatted if desc else ""
         ])
         table.add_row(*row_args)
     
     console.print(table)
-    console.print(f"\n[dim]Found {len(packages)} package(s)[/dim]")
+    footer_text = f"Found {len(packages)} package(s)"
+    if elapsed_ms is not None:
+        footer_text += f" (completed in {elapsed_ms} ms)"
+    console.print(f"\n[dim]{footer_text}[/dim]")
     return sorted_packages

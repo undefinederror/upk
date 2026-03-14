@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-14
+
+### Added
+- **UI Enhancements**: Combined Version and Installed columns for a cleaner look.
+- **Live Progress**: Added backend-specific progress tracking for installed status checks.
+- **Description Column**: Added a dedicated description column to the search and list views.
+
 ## [1.1.1] - 2026-03-12
 
 ### Fixed

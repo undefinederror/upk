@@ -11,6 +11,7 @@ class PackageInfo:
     name: str
     version: str
     source: str
+    description: Optional[str] = None
     installed_version: Optional[str] = None
 
     @property

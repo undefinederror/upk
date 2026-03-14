@@ -36,8 +36,6 @@ class AptBackend(Backend):
 
     def search(self, query: str) -> List[PackageInfo]:
         """Search for packages using Nala or apt."""
-        # Pre-fetch installed cache once per search
-        self._load_installed_cache()
         
         if self._has_nala():
             return self._search_nala(query)
@@ -83,35 +81,73 @@ class AptBackend(Backend):
         # Example: firefox/jammy-updates 121.0+build1-0ubuntu0.22.04.1 amd64
         apt_pattern = r'^([a-zA-Z0-9][a-zA-Z0-9+._-]+)/\S+\s+(\S+)'
         
-        for line in output.split('\n'):
+        lines = output.split('\n')
+        i = 0
+        while i < len(lines):
+            line = lines[i]
             # Try Nala format first
             match = re.match(nala_pattern, line)
+            is_apt = False
             if not match:
                 # Try APT format
                 match = re.match(apt_pattern, line)
+                if match:
+                    is_apt = True
             
             if match:
                 package_name = match.group(1)
                 version = match.group(2)
+                description = None
+                # Check subsequent lines for description/metadata
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j].strip()
+                    # Stop if we hit a new package header or empty line
+                    if not next_line or re.match(nala_pattern, next_line) or re.match(apt_pattern, next_line):
+                        break
+                    
+                    # Clean up Nala tree characters
+                    clean_line = next_line
+                    if clean_line.startswith("└── "):
+                        clean_line = clean_line[4:]
+                    elif clean_line.startswith("├── "):
+                        clean_line = clean_line[4:]
+                    elif clean_line.startswith("├─ "):
+                        clean_line = clean_line[3:]
+                    
+                    # Skip Nala status information
+                    if clean_line.lower() in ["is installed", "is upgradable", "is manually installed"]:
+                        j += 1
+                        continue
+                    
+                    # If we found a valid text description
+                    if not description:
+                        description = clean_line
+                    else:
+                        description += " " + clean_line
+                    
+                    j += 1
                 
-                # Get installed version from cache
-                installed_version = self.get_installed_version(package_name)
+                # Advance main loop index to where we stopped
+                i = j - 1
                 
                 packages.append(PackageInfo(
                     name=package_name,
                     version=version,
                     source=self.name,
-                    installed_version=installed_version
+                    description=description,
+                    installed_version=None
                 ))
+            i += 1
         
         return packages
 
     def _load_installed_cache(self) -> None:
         """Load all installed packages into cache."""
         try:
-            # dpkg-query -W -f='${db:Status-Status} ${Package} ${Version}\n'
+            # dpkg-query -W -f='${db:Status-Status} ${Package} ${Version}\t${binary:Summary}\n'
             result = subprocess.run(
-                ["dpkg-query", "-W", "-f=${db:Status-Status} ${Package} ${Version}\n"],
+                ["dpkg-query", "-W", "-f=${db:Status-Status} ${Package} ${Version}\t${binary:Summary}\n"],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -119,18 +155,26 @@ class AptBackend(Backend):
             self._installed_cache = {}
             for line in result.stdout.split('\n'):
                 if line.strip():
-                    parts = line.split()
-                    if len(parts) >= 3:
-                        status, name, version = parts[0], parts[1], parts[2]
+                    parts = line.split('\t')
+                    if len(parts) >= 2:
+                        first_part = parts[0].split()
+                        description = parts[1].strip()
+                    else:
+                        first_part = line.split()
+                        description = None
+                        
+                    if len(first_part) >= 3:
+                        status, name, version = first_part[0], first_part[1], first_part[2]
                         if status == "installed":
-                            self._installed_cache[name] = version
+                            self._installed_cache[name] = {"version": version, "description": description}
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self._installed_cache = {}
 
     def get_installed_version(self, package_name: str) -> Optional[str]:
         """Get installed version using cache (or fallback)."""
         if self._installed_cache is not None:
-            return self._installed_cache.get(package_name)
+            info = self._installed_cache.get(package_name)
+            return info["version"] if info else None
             
         # Fallback to single command if cache not loaded
         try:
@@ -251,12 +295,13 @@ class AptBackend(Backend):
             return []
             
         packages = []
-        for name, version in self._installed_cache.items():
+        for name, info in self._installed_cache.items():
             packages.append(PackageInfo(
                 name=name,
-                version=version,
+                version=info["version"],
                 source=self.name,
-                installed_version=version
+                description=info.get("description"),
+                installed_version=info["version"]
             ))
         return packages
 

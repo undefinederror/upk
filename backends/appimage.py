@@ -79,19 +79,35 @@ class AppImageBackend(Backend):
                             name=name,
                             version="local",
                             source=self.name,
+                            description=None,
                             installed_version="local"
                         ))
                 else:
                     match = re.search(managed_pattern, line)
                     if match:
                         name = match.group(1).strip()
-                        version = match.group(3).strip()
+                        version = match.group(2).strip()
                         packages.append(PackageInfo(
                             name=name,
                             version=version,
                             source=self.name,
+                            description=None,
                             installed_version=version
                         ))
+        # Fetch descriptions for installed packages using 'am -q' (fast for small lists)
+        for pkg in packages:
+            try:
+                # We can search for the exact name to get the description
+                q_result = self._run_am(["-q", pkg.name])
+                if q_result.returncode == 0:
+                    q_packages = self._parse_search_output(q_result.stdout)
+                    for q_pkg in q_packages:
+                        if q_pkg.name == pkg.name:
+                            pkg.description = q_pkg.description
+                            break
+            except Exception:
+                pass
+
         return packages
 
     def get_installed_version(self, package_name: str) -> Optional[str]:
@@ -110,20 +126,39 @@ class AppImageBackend(Backend):
         if result.returncode != 0:
             return []
 
-        packages: List[PackageInfo] = []
-        # Format: ◆ name : description
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            if line.startswith("◆"):
-                parts = line.split(":", 1)
+        return self._parse_search_output(result.stdout)
+
+    def _parse_search_output(self, output: str) -> List[PackageInfo]:
+        """Parse am -q output with multi-line description support."""
+        packages = []
+        current_pkg = None
+        
+        for line in output.splitlines():
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+                
+            if line_stripped.startswith("◆"):
+                parts = line_stripped.split(":", 1)
                 name = parts[0].replace("◆", "").strip()
-                # am search doesn't show remote versions, so we use 'latest'
-                packages.append(PackageInfo(
+                desc = parts[1].strip() if len(parts) > 1 else ""
+                
+                current_pkg = PackageInfo(
                     name=name,
                     version="latest",
                     source=self.name,
-                    installed_version=self.get_installed_version(name)
-                ))
+                    description=desc,
+                    installed_version=None
+                )
+                packages.append(current_pkg)
+            elif current_pkg:
+                # Only append if the line doesn't look like a header or separator
+                if not line_stripped.startswith("-") and not line_stripped.startswith("SEARCH RESULTS"):
+                    if current_pkg.description:
+                        current_pkg.description += " " + line_stripped
+                    else:
+                        current_pkg.description = line_stripped
+                        
         return packages
 
     def install(self, package: str, extra_args: List[str] = None) -> bool:

@@ -34,8 +34,6 @@ class PacstallBackend(Backend):
         if not self.is_available():
             return []
 
-        self._load_installed_cache()
-
         try:
             result = subprocess.run(
                 ["pacstall", "-S", query],
@@ -43,33 +41,7 @@ class PacstallBackend(Backend):
                 text=True,
                 timeout=10
             )
-            packages = self._parse_search_output(result.stdout)
-            
-            # Fetch remote versions concurrently
-            import concurrent.futures
-            
-            def fetch_version(pkg: PackageInfo):
-                if pkg.version != "unknown":
-                    return pkg
-                try:
-                    info_result = subprocess.run(
-                        ["pacstall", "-Si", pkg.name],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    import re
-                    match = re.search(r'pkgver\s*=\s*(\S+)', info_result.stdout)
-                    if match:
-                        pkg.version = match.group(1)
-                except Exception:
-                    pass
-                return pkg
-                
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                list(executor.map(fetch_version, packages))
-                
-            return packages
+            return self._parse_search_output(result.stdout)
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return []
 
@@ -95,15 +67,14 @@ class PacstallBackend(Backend):
                 package_name = parts[0].strip()
                 
                 # Pacstall search doesn't show version, so default to unknown
-                # unless we have it in the installed cache
-                installed_version = self.get_installed_version(package_name)
-                version = installed_version if installed_version else "unknown"
+                version = "unknown"
 
                 packages.append(PackageInfo(
                     name=package_name,
                     version=version,
                     source=self.name,
-                    installed_version=installed_version
+                    description=None,
+                    installed_version=None
                 ))
 
         return packages
@@ -122,23 +93,50 @@ class PacstallBackend(Backend):
                 timeout=5
             )
             self._installed_cache = {}
+            import os
             for line in result.stdout.split('\n'):
-                # Installed lines often look like:
-                # ~ package-name@version
+                line = line.strip()
+                if not line:
+                    continue
+                
+                name = None
+                version = "unknown"
+                
                 if line.startswith('~ '):
                     line = line[len('~ '):].strip()
                     parts = line.split('@')
                     if len(parts) >= 2:
                         name = parts[0].strip()
                         version = parts[1].strip()
-                        self._installed_cache[name] = version
+                else:
+                    name = line
+                
+                if name:
+                    # Try to get version and description from metadata file if unknown
+                    if version == "unknown":
+                        metadata_path = f"/var/lib/pacstall/metadata/{name}"
+                        if os.path.exists(metadata_path):
+                            try:
+                                with open(metadata_path, 'r') as f:
+                                    for meta_line in f:
+                                        if meta_line.startswith('_version='):
+                                            version = meta_line.split('=', 1)[1].strip().strip('"').strip("'")
+                                            break
+                            except Exception:
+                                pass
+                                
+                    self._installed_cache[name] = {
+                        "version": version,
+                        "description": None 
+                    }
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self._installed_cache = {}
 
     def get_installed_version(self, package_name: str) -> Optional[str]:
         """Get installed version using cache."""
         if self._installed_cache is not None:
-            return self._installed_cache.get(package_name)
+            info = self._installed_cache.get(package_name)
+            return info["version"] if info else None
 
         if not self.is_available():
             return None
@@ -216,11 +214,12 @@ class PacstallBackend(Backend):
             return []
             
         packages = []
-        for name, version in self._installed_cache.items():
+        for name, info in self._installed_cache.items():
             packages.append(PackageInfo(
                 name=name,
-                version=version,
+                version=info["version"],
                 source=self.name,
-                installed_version=version
+                description=info.get("description"),
+                installed_version=info["version"]
             ))
         return packages

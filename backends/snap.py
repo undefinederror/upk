@@ -34,9 +34,6 @@ class SnapBackend(Backend):
         if not self.is_available():
             return []
 
-        # Pre-fetch installed cache once per search
-        self._load_installed_cache()
-
         try:
             result = subprocess.run(
                 ["snap", "find", query],
@@ -44,13 +41,15 @@ class SnapBackend(Backend):
                 text=True,
                 timeout=10
             )
-            return self._parse_search_output(result.stdout)
+            return self._parse_search_output(result.stdout, query)
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return []
 
-    def _parse_search_output(self, output: str) -> List[PackageInfo]:
+    def _parse_search_output(self, output: str, query: Optional[str] = None) -> List[PackageInfo]:
         """Parse snap find output."""
         packages = []
+        if query:
+            query = query.lower()
         lines = output.split('\n')
         
         # Skip header line
@@ -64,15 +63,22 @@ class SnapBackend(Backend):
             if len(parts) >= 2:
                 package_name = parts[0]
                 version = parts[1]
+                description = ' '.join(parts[4:]) if len(parts) >= 5 else None
                 
-                # Get installed version from cache
-                installed_version = self.get_installed_version(package_name)
                 
+                # Filter matches if query is provided - make sure it's in name or summary
+                # to avoid publisher-only matches
+                if query:
+                    summary_text = description.lower() if description else ""
+                    if query not in package_name.lower() and query not in summary_text:
+                        continue
+
                 packages.append(PackageInfo(
                     name=package_name,
                     version=version,
                     source=self.name,
-                    installed_version=installed_version
+                    description=description,
+                    installed_version=None
                 ))
         
         return packages
@@ -97,14 +103,35 @@ class SnapBackend(Backend):
                     continue
                 parts = line.split()
                 if len(parts) >= 2:
-                    self._installed_cache[parts[0]] = parts[1]
+                    name = parts[0]
+                    version = parts[1]
+                    
+                    # Try to get summary from local metadata (fast)
+                    summary = None
+                    try:
+                        yaml_path = f"/snap/{name}/current/meta/snap.yaml"
+                        import os
+                        if os.path.exists(yaml_path):
+                            with open(yaml_path, 'r') as f:
+                                for l in f:
+                                    if l.startswith("summary:"):
+                                        summary = l.split(":", 1)[1].strip()
+                                        break
+                    except Exception:
+                        pass
+                        
+                    self._installed_cache[name] = {
+                        "version": version,
+                        "description": summary
+                    }
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self._installed_cache = {}
 
     def get_installed_version(self, package_name: str) -> Optional[str]:
         """Get installed version using cache (or fallback)."""
         if self._installed_cache is not None:
-            return self._installed_cache.get(package_name)
+            info = self._installed_cache.get(package_name)
+            return info["version"] if info else None
 
         if not self.is_available():
             return None
@@ -150,11 +177,11 @@ class SnapBackend(Backend):
             return False
 
     def update(self) -> bool:
-        """Update package lists using snap (snaps update automatically, but we can check)."""
+        """Update package lists using snap."""
         if not self.is_available():
             return False
             
-        return True  # Snap handles its own list updates
+        return True
 
     def upgrade(self, package_name: Optional[str] = None) -> bool:
         """Upgrade packages using snap."""
@@ -195,11 +222,12 @@ class SnapBackend(Backend):
             return []
             
         packages = []
-        for name, version in self._installed_cache.items():
+        for name, info in self._installed_cache.items():
             packages.append(PackageInfo(
                 name=name,
-                version=version,
+                version=info["version"],
                 source=self.name,
-                installed_version=version
+                description=info.get("description"),
+                installed_version=info["version"]
             ))
         return packages
