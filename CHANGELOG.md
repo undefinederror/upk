@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-03-18
+
+### Refactored
+- **Project Structure**: Completely reorganized into a standard Python package format.
+- **Packaging**: Switched to `pyproject.toml` and declarative metadata.
+- **Infrastructure**: Simplified `setup.py`, `build.sh`, and `pacscript` logic.
+
 ## [1.2.0] - 2026-03-14
 
 ### Added

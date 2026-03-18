@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 from rich.console import Console
 from rich.progress import Progress, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
-from config import load_config
+from .config import load_config
 
 
 def detect_file_type(file_path: str) -> Optional[str]:

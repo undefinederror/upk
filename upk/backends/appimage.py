@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .base import Backend, PackageInfo
-from utils import get_appimages_dir
+from ..utils import get_appimages_dir
 
 
 class AppImageBackend(Backend):

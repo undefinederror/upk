@@ -35,7 +35,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # Read version from VERSION file
-VERSION=$(cat VERSION)
+VERSION=$(cat upk/VERSION)
 print_status "Building UPK version: $VERSION"
 
 # Create temporary directory for packaging
@@ -47,21 +47,14 @@ mkdir -p "$TEMP_DIR"/{DEBIAN,usr/bin,usr/share/doc/upk,usr/lib/python3/dist-pack
 
 # Copy source files to package structure
 print_status "Copying source files to package structure..."
-cp -r backends "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
-cp config.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
-cp display.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
-cp search.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
-cp utils.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
-cp upk.py "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
-cp VERSION "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
+cp -r upk/* "$TEMP_DIR/usr/lib/python3/dist-packages/upk/"
 
 # Create wrapper script
 print_status "Creating wrapper script..."
 cat > "$TEMP_DIR/usr/bin/upk" << 'EOF'
 #!/bin/bash
 # UPK wrapper script
-cd /usr/lib/python3/dist-packages/upk
-exec python3 upk.py "$@"
+exec python3 -m upk.upk "$@"
 EOF
 
 chmod +x "$TEMP_DIR/usr/bin/upk"
@@ -80,7 +73,7 @@ fi
 
 # Set PYTHONPATH to current directory to ensure backends can be imported
 export PYTHONPATH=$PYTHONPATH:.
-_UPK_COMPLETE=bash_source python3 upk.py > "$TEMP_DIR/usr/share/bash-completion/completions/upk"
+_UPK_COMPLETE=bash_source python3 -m upk.upk > "$TEMP_DIR/usr/share/bash-completion/completions/upk"
 print_success "Bash completion script created"
 
 # Create control file from template

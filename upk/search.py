@@ -3,7 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Callable, Optional
 
-from backends.base import Backend, PackageInfo
+from .backends.base import Backend, PackageInfo
 
 
 def search_all_backends(

@@ -5,7 +5,7 @@ from typing import List, Optional
 from rich.console import Console
 from rich.table import Table
 
-from backends.base import PackageInfo
+from .backends.base import PackageInfo
 
 
 def display_search_results(packages: List[PackageInfo], show_numbers: bool = False, elapsed_ms: Optional[int] = None) -> List[PackageInfo]:
@@ -36,7 +36,7 @@ def display_search_results(packages: List[PackageInfo], show_numbers: bool = Fal
     
     # Get sort order from config
     try:
-        from config import load_config
+        from .config import load_config
         config = load_config()
         priority = config.get("backends_priority", [])
     except ImportError:

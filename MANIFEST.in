@@ -1,4 +1,4 @@
 include README.md
 include LICENSE
-recursive-include backends *.py
-include VERSION
+recursive-include upk/backends *.py
+include upk/VERSION

@@ -3,9 +3,9 @@
 
 import click
 
-from backends import AptBackend, SnapBackend, FlatpakBackend, PacstallBackend, AppImageBackend
-from display import display_search_results
-from search import search_all_backends
+from .backends import AptBackend, SnapBackend, FlatpakBackend, PacstallBackend, AppImageBackend
+from .display import display_search_results
+from .search import search_all_backends
 
 
 import os
@@ -19,7 +19,29 @@ def get_version():
                 return f.read().strip()
     except Exception:
         pass
-    return "1.1.0"
+    return "1.2.0"
+    
+def deduplicate_results(results: list) -> list:
+    """
+    Deduplicate results when a package is reported by both APT and Pacstall.
+    Pacstall is preferred for removal and listing if it's the same package.
+    """
+    # Only care about installed packages for this specific deduplication
+    pacstall_installed = {p.name: p for p in results if p.source == 'pacstall' and p.is_installed}
+    if not pacstall_installed:
+        return results
+        
+    final_results = []
+    for p in results:
+        # If it's an APT package that's also installed via Pacstall
+        if p.source == 'apt' and p.name in pacstall_installed:
+            # Transfer description to Pacstall if the latter is missing one
+            if not pacstall_installed[p.name].description and p.description:
+                pacstall_installed[p.name].description = p.description
+            # Skip this APT entry
+            continue
+        final_results.append(p)
+    return final_results
 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']), name="upk")
 @click.version_option(get_version(), '-v', '--version', message="upk version %(version)s")
@@ -47,7 +69,7 @@ def get_configured_backends(source: str = None) -> list:
         return available
         
     try:
-        from config import load_config
+        from .config import load_config
         config = load_config()
         disabled = config.get("disabled_backends", [])
         preference = config.get("backends_priority", ["apt", "flatpak", "snap", "pacstall"])
@@ -135,6 +157,7 @@ def search(query: str, exact: bool):
             live.update(generate_status_table())
             live.refresh()
             
+        from .search import search_all_backends
         results = search_all_backends(available_backends, query, update_progress)
         live.update(generate_status_table())
         
@@ -160,7 +183,7 @@ def search(query: str, exact: bool):
                 live.update(generate_installed_status_table())
                 live.refresh()
 
-            from search import list_all_backends
+            from .search import list_all_backends
             installed_pkgs = list_all_backends(available_backends, update_installed_progress)
             installed_dict = {(p.name, p.source): p.installed_version for p in installed_pkgs if p.installed_version}
             
@@ -168,6 +191,9 @@ def search(query: str, exact: bool):
                 pkg.installed_version = installed_dict.get((pkg.name, pkg.source))
                 if pkg.installed_version and (pkg.version == "latest" or pkg.version == "unknown"):
                     pkg.version = pkg.installed_version
+            
+            # Deduplicate installed results (prefer Pacstall)
+            results = deduplicate_results(results)
         
     elapsed_ms = int((time.time() - start_time) * 1000)
     
@@ -202,7 +228,7 @@ def install_package(package_name: str, exact: bool = False, extra_args: list = N
     # Search for matching packages to offer a prompt
     console.print(f"Searching for [bold cyan]{package_name}[/bold cyan] across available sources...")
     
-    from search import search_all_backends
+    from .search import search_all_backends
     results = search_all_backends(available_backends, package_name)
     
     # Filter for exact matches if requested
@@ -257,7 +283,7 @@ def install_local_file(file_path: str, extra_args: list = None) -> bool:
         extra_args = []
     
     import os
-    from utils import detect_file_type, get_appimages_dir
+    from .utils import detect_file_type, get_appimages_dir
     
     absolute_path = os.path.abspath(file_path)
     detected_source = detect_file_type(absolute_path)
@@ -302,7 +328,7 @@ def install_remote_file(url: str, extra_args: list = None) -> bool:
     if extra_args is None:
         extra_args = []
     
-    from utils import download_remote_file, cleanup_downloads
+    from .utils import download_remote_file, cleanup_downloads
     
     # 1. Download the file
     downloaded_file = download_remote_file(url)
@@ -345,7 +371,7 @@ def install(package: str, exact: bool, extra_args: tuple):
     
     import os
     from urllib.parse import urlparse
-    from utils import is_local_file
+    from .utils import is_local_file
     
     # Convert extra_args tuple to list
     extra = list(extra_args)
@@ -404,7 +430,7 @@ def upgrade(package: str):
         
     if package:
         console.print(f"Checking where [bold cyan]{package}[/bold cyan] is installed...")
-        from search import search_all_backends
+        from .search import search_all_backends
         results = search_all_backends(available_backends, package)
         installed_sources = {pkg.source for pkg in results if pkg.name == package and pkg.is_installed}
         
@@ -435,8 +461,11 @@ def remove(package: str):
     available_backends = get_configured_backends()
         
     console.print(f"Searching for [bold cyan]{package}[/bold cyan] among installed packages...")
-    from search import list_all_backends
+    from .search import list_all_backends
     results = list_all_backends(available_backends)
+    
+    # Deduplicate results (prefer Pacstall for removal)
+    results = deduplicate_results(results)
     
     # Check for exact case-insensitive match first
     exact_results = [pkg for pkg in results if pkg.name.lower() == package.lower()]
@@ -454,7 +483,7 @@ def remove(package: str):
         chosen_pkg = results[0]
         console.print(f"Found installed in {chosen_pkg.source}, removing...")
     else:
-        from display import display_search_results
+        from .display import display_search_results
         sorted_results = display_search_results(results, show_numbers=True)
         choice = Prompt.ask(
             "Enter the number of the package to remove (or 'q' to cancel)", 
@@ -483,7 +512,7 @@ def list_pkgs(package: str, exact: bool):
     from rich.live import Live
     from rich.table import Table
     from rich.spinner import Spinner
-    from search import list_all_backends
+    from .search import list_all_backends
     
     available_backends = get_configured_backends()
     
@@ -508,8 +537,12 @@ def list_pkgs(package: str, exact: bool):
             live.update(generate_status_table())
             live.refresh()
             
+        from .search import list_all_backends
         results = list_all_backends(available_backends, update_progress)
         live.update(generate_status_table())
+    
+    # Deduplicate results (prefer Pacstall in listing)
+    results = deduplicate_results(results)
     
     if package:
         if exact:
@@ -541,7 +574,7 @@ def config(action: str, key: str, value: str):
       interactive_prompts (true/false)
     """
     import json
-    from config import load_config, set_value, DEFAULT_CONFIG
+    from .config import load_config, set_value, DEFAULT_CONFIG
     from rich.console import Console
     console = Console()
     

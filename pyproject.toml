@@ -2,19 +2,44 @@
 name = "upk"
 dynamic = ["version"]
 description = "Ubuntu Package Kit - Universal package manager wrapper"
-authors = [{name = "undefinederror (Lorenzo Paci)"}]
+authors = [
+    { name = "undefinederror (Lorenzo Paci)", email = "github@object.ninja" }
+]
+readme = "README.md"
 requires-python = ">=3.10"
+keywords = ["package manager", "apt", "snap", "flatpak", "pacstall", "appimage"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Installation/Setup",
+    "Topic :: System :: Software Distribution",
+    "Topic :: Utilities",
+]
 dependencies = [
     "click>=8.1.0",
     "rich>=13.0.0",
 ]
 
+[project.urls]
+"Bug Reports" = "https://github.com/undefinederror/upk/issues"
+"Source" = "https://github.com/undefinederror/upk"
+
 [project.scripts]
-upk = "upk:cli"
+upk = "upk.upk:cli"
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = {file = "VERSION"}
+version = {file = "upk/VERSION"}
+
+[tool.setuptools]
+packages = ["upk", "upk.backends"]
+include-package-data = true
