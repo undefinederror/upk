@@ -23,24 +23,38 @@ def get_version():
     
 def deduplicate_results(results: list) -> list:
     """
-    Deduplicate results when a package is reported by both APT and Pacstall.
-    Pacstall is preferred for removal and listing if it's the same package.
+    Deduplicate results when a package is reported by both APT and another backend.
+    Backends like Pacstall are preferred if they provide the same software.
     """
-    # Only care about installed packages for this specific deduplication
-    pacstall_installed = {p.name: p for p in results if p.source == 'pacstall' and p.is_installed}
-    if not pacstall_installed:
+    # Find all names provided by non-apt installed packages
+    non_apt_installed = [p for p in results if p.source != 'apt' and p.is_installed]
+    if not non_apt_installed:
         return results
         
+    # Map of names that should cause an APT package to be hidden
+    hidden_names = set()
+    for p in non_apt_installed:
+        hidden_names.add(p.name)
+        if p.provides:
+            for provided in p.provides:
+                hidden_names.add(provided)
+                
     final_results = []
-    for p in results:
-        # If it's an APT package that's also installed via Pacstall
-        if p.source == 'apt' and p.name in pacstall_installed:
-            # Transfer description to Pacstall if the latter is missing one
-            if not pacstall_installed[p.name].description and p.description:
-                pacstall_installed[p.name].description = p.description
-            # Skip this APT entry
+    apt_results = [p for p in results if p.source == 'apt']
+    other_results = [p for p in results if p.source != 'apt']
+    
+    for p in apt_results:
+        if p.name in hidden_names:
+            # This APT package is covered by another backend
+            # Transfer description to the provider if it's missing
+            for other in non_apt_installed:
+                if other.name == p.name or (other.provides and p.name in other.provides):
+                    if not other.description and p.description:
+                        other.description = p.description
             continue
         final_results.append(p)
+        
+    final_results.extend(other_results)
     return final_results
 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']), name="upk")
@@ -430,9 +444,9 @@ def upgrade(package: str):
         
     if package:
         console.print(f"Checking where [bold cyan]{package}[/bold cyan] is installed...")
-        from .search import search_all_backends
-        results = search_all_backends(available_backends, package)
-        installed_sources = {pkg.source for pkg in results if pkg.name == package and pkg.is_installed}
+        from .search import list_all_backends
+        results = list_all_backends(available_backends)
+        installed_sources = {pkg.source for pkg in results if pkg.name.lower() == package.lower()}
         
         if not installed_sources:
             console.print(f"[yellow]No installed exact match for '{package}' found in any selected source.[/yellow]")

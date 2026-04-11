@@ -112,22 +112,35 @@ class PacstallBackend(Backend):
                     name = line
                 
                 if name:
-                    # Try to get version and description from metadata file if unknown
-                    if version == "unknown":
-                        metadata_path = f"/var/lib/pacstall/metadata/{name}"
-                        if os.path.exists(metadata_path):
-                            try:
-                                with open(metadata_path, 'r') as f:
-                                    for meta_line in f:
-                                        if meta_line.startswith('_version='):
-                                            version = meta_line.split('=', 1)[1].strip().strip('"').strip("'")
-                                            break
-                            except Exception:
-                                pass
+                    provides = []
+                    # Try to get metadata from file
+                    metadata_path = f"/var/lib/pacstall/metadata/{name}"
+                    if os.path.exists(metadata_path):
+                        try:
+                            with open(metadata_path, 'r') as f:
+                                for meta_line in f:
+                                    # Get version
+                                    if version == "unknown" and meta_line.startswith('_version='):
+                                        version = meta_line.split('=', 1)[1].strip().strip('"').strip("'")
+                                    
+                                    # Get gives/replaces/provides to link names
+                                    if meta_line.startswith(('_gives=', '_provides=', '_replaces=')):
+                                        val = meta_line.split('=', 1)[1].strip().strip('"').strip("'")
+                                        # Handle array format like ("name1" "name2")
+                                        if val.startswith('(') and val.endswith(')'):
+                                            val = val[1:-1].strip()
+                                            names = [n.strip().strip('"').strip("'") for n in val.split(' ')]
+                                            provides.extend([n for n in names if n])
+                                        else:
+                                            if val:
+                                                provides.append(val)
+                        except Exception:
+                            pass
                                 
                     self._installed_cache[name] = {
                         "version": version,
-                        "description": None 
+                        "description": None,
+                        "provides": list(set(provides)) # Deduplicate
                     }
         except (subprocess.TimeoutExpired, FileNotFoundError):
             self._installed_cache = {}
@@ -220,6 +233,7 @@ class PacstallBackend(Backend):
                 version=info["version"],
                 source=self.name,
                 description=info.get("description"),
-                installed_version=info["version"]
+                installed_version=info["version"],
+                provides=info.get("provides", [])
             ))
         return packages

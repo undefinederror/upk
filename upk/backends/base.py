@@ -13,6 +13,7 @@ class PackageInfo:
     source: str
     description: Optional[str] = None
     installed_version: Optional[str] = None
+    provides: List[str] = None
 
     @property
     def is_installed(self) -> bool:
