@@ -361,7 +361,7 @@ def install_remote_file(url: str, extra_args: list = None) -> bool:
 
 
 @cli.command()
-@click.argument('package')
+@click.argument('package', type=click.Path())
 @click.option('-e', '--exact', is_flag=True, help='Show only exact matches')
 @click.argument('extra_args', nargs=-1)
 def install(package: str, exact: bool, extra_args: tuple):

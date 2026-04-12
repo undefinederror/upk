@@ -2,9 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.3] - 2026-04-12
+
+### Fixed
+- **Shell Autocomplete**: Fixed filesystem path completion for the `install` command.
+
 ## [1.2.2] - 2026-04-10
 
-### Added
+### Fixed
 - **Smart Pacstall Deduplication**: Added metadata parsing for `gives`, `provides`, and `replaces` fields. `upk` now correctly identifies Pacstall packages (like `bitwarden-deb`) as aliasing standard system packages, preventing duplicate entries and prioritizing clean removals.
 
 ## [1.2.1] - 2026-03-18
