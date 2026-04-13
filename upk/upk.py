@@ -249,6 +249,14 @@ def install_package(package_name: str, exact: bool = False, extra_args: list = N
     if exact:
         results = [pkg for pkg in results if pkg.name == package_name]
     
+    # Populate installed status for results
+    if results:
+        from .search import list_all_backends
+        installed_pkgs = list_all_backends(available_backends)
+        installed_dict = {(p.name, p.source): p.installed_version for p in installed_pkgs if p.installed_version}
+        for pkg in results:
+            pkg.installed_version = installed_dict.get((pkg.name, pkg.source))
+
     sorted_results = display_search_results(results, show_numbers=True)
     
     if not sorted_results:
