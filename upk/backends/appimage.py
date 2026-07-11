@@ -52,8 +52,10 @@ class AppImageBackend(Backend):
         packages: List[PackageInfo] = []
         
         # 1. Parse Managed section (Official DB)
-        # Format: ◆ name | db | version | type | size
-        managed_pattern = r'◆\s+([^\s|]+)\s+\|\s+([^\s|]+)\s+\|\s+([^\s|]+)\s+\|\s+([^\s|]+)'
+        # Format: ◆ name | version | type | size
+        # Note: version may include a trailing " ✓" checkmark (e.g. "13.3.0 ✓"),
+        # so we match each field as anything up to the next "|" and strip whitespace.
+        managed_pattern = r'◆\s+([^|]+?)\s+\|\s+([^|]+?)\s+\|\s+([^|]+?)\s+\|\s+([^|]+?)\s*$'
         
         # 2. Parse Integrated section (Local files via --launcher)
         # Format: ◆ Filename | Path | Size
@@ -86,7 +88,8 @@ class AppImageBackend(Backend):
                     match = re.search(managed_pattern, line)
                     if match:
                         name = match.group(1).strip()
-                        version = match.group(2).strip()
+                        # Strip trailing " ✓" checkmark AM appends to up-to-date packages
+                        version = match.group(2).strip().rstrip("✓").strip()
                         packages.append(PackageInfo(
                             name=name,
                             version=version,

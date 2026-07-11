@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.5] - 2026-07-11
+
+### Fixed
+- **Am list results**: Fixed parsing of am -f results.
+
 ## [1.2.4] - 2026-04-13
 
 ### Fixed
