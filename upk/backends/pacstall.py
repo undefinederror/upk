@@ -187,16 +187,19 @@ class PacstallBackend(Backend):
         except Exception:
             return False
 
-    def upgrade(self, package_name: Optional[str] = None) -> bool:
+    def upgrade(self, package_name: Optional[str] = None, extra_args: List[str] = None) -> bool:
         """Upgrade packages using pacstall."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
             if package_name:
-                cmd = ["sudo", "pacstall", "-I", package_name, "-P"]
+                cmd = ["sudo", "pacstall", "-I"] + extra_args + [package_name, "-P"]
             else:
-                cmd = ["sudo", "pacstall", "-Up", "-P"]
+                cmd = ["sudo", "pacstall", "-Up", "-P"] + extra_args
             result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
@@ -204,13 +207,17 @@ class PacstallBackend(Backend):
         except Exception:
             return False
 
-    def remove(self, package_name: str) -> bool:
+    def remove(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Remove a package using pacstall."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
-            result = subprocess.run(["sudo", "pacstall", "-R", package_name, "-P"])
+            cmd = ["sudo", "pacstall", "-R"] + extra_args + [package_name, "-P"]
+            result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
             return False

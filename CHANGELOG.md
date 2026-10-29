@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] 2026-10-29
+
+### Added
+- **Extra Arguments for Upgrade/Remove**: The `upgrade` and `remove` commands now support extra arguments passed to backends via `--` separator (e.g., `upk upgrade miniclip -- --stable` to switch a snap from edge to stable channel, `upk remove pkg -- --purge`).
+- **Search Cache**: Search results are now cached for 1 day, making repeated searches instant. Cache is automatically cleared on `upk update`. Use `--no-cache` to bypass.
+
 ## [1.2.5] - 2026-07-11
 
 ### Fixed

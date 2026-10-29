@@ -26,6 +26,11 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
 [project.urls]
 "Bug Reports" = "https://github.com/undefinederror/upk/issues"
 "Source" = "https://github.com/undefinederror/upk"

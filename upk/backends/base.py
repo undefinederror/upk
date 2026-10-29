@@ -86,12 +86,13 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def upgrade(self, package_name: Optional[str] = None) -> bool:
+    def upgrade(self, package_name: Optional[str] = None, extra_args: List[str] = None) -> bool:
         """
         Upgrade all packages, or a specific package if provided.
         
         Args:
             package_name: Optional package to upgrade
+            extra_args: Optional list of extra arguments to pass to the backend
             
         Returns:
             True if successful, False otherwise
@@ -99,12 +100,13 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def remove(self, package_name: str) -> bool:
+    def remove(self, package_name: str, extra_args: List[str] = None) -> bool:
         """
         Remove a package.
         
         Args:
             package_name: Name of the package to remove
+            extra_args: Optional list of extra arguments to pass to the backend
             
         Returns:
             True if successful, False otherwise

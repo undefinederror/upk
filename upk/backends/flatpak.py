@@ -188,13 +188,16 @@ class FlatpakBackend(Backend):
         except Exception:
             return False
 
-    def upgrade(self, package_name: Optional[str] = None) -> bool:
+    def upgrade(self, package_name: Optional[str] = None, extra_args: List[str] = None) -> bool:
         """Upgrade packages using flatpak."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
-            cmd = ["flatpak", "update", "-y"]
+            cmd = ["flatpak", "update", "-y"] + extra_args
             if package_name:
                 cmd.append(package_name)
             result = subprocess.run(cmd)
@@ -204,13 +207,17 @@ class FlatpakBackend(Backend):
         except Exception:
             return False
 
-    def remove(self, package_name: str) -> bool:
+    def remove(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Remove a package using flatpak."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
         try:
-            result = subprocess.run(["flatpak", "uninstall", "-y", package_name])
+            cmd = ["flatpak", "uninstall", "-y"] + extra_args + [package_name]
+            result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
             return False

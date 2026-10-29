@@ -6,28 +6,29 @@ A unified CLI for managing packages across multiple package managers on Ubuntu s
 >> upk install firefox -e
 Searching for firefox across available sources...
 
-┏━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
-┃ # ┃ Package Name ┃ Version           ┃ Source ┃ Installed           ┃
-┡━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
-│ 1 │ firefox      │ 1:1snap1-0ubuntu7 │ apt    │ 1:1snap1-0ubuntu7 ✓ │
-│ 2 │ firefox      │ 147.0.4-1         │ snap   │ 147.0.4-1 ✓         │
-└───┴──────────────┴───────────────────┴────────┴─────────────────────┘
+┏━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ # ┃ Package Name ┃ Version               ┃ Source   ┃ Description                                                ┃
+┡━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1 │ firefox      │ 1:1snap1-0ubuntu9.1 ✓ │ apt      │ Installs Firefox snap and provides some system integration │
+│ 2 │ firefox      │ 156.0.1-1 ✓           │ snap     │ Mozilla Firefox web browser                                │
+│ 3 │ firefox      │ latest                │ appimage │ Fast, powerful and extensible Web Browser, Stable.         │
+└───┴──────────────┴───────────────────────┴──────────┴────────────────────────────────────────────────────────────┘
 
-Found 2 package(s)
-Enter the number of the package to install (or 'q' to cancel): 
+Found 3 package(s)
+Enter the number of the package to install (or 'q' to cancel):
+
 ```
 
 ## Features
 
-- 🔍 **Search packages** across all configured backends with live progress
+- 🔍 **Search packages** across all configured backends with live progress and result caching
 - ⬇️ **Install packages** with interactive source selection
 - 📦 **Install local files** - supports `.deb` and `.AppImage` files
 - 🌐 **Install remote files** - download and install from URLs
 - 🔄 **Update package lists** and upgrade packages
 - 🗑️ **Remove packages** with automatic source detection
 - 📋 **List installed packages** with filtering options
-- ⚙️ **Configuration system** for customizing behavior
-- 🎯 **Exact match searching** to find specific packages
+
 
 ## Available Backends
 
@@ -42,7 +43,10 @@ Enter the number of the package to install (or 'q' to cancel):
 **Note**: Backends are automatically disabled if their required command isn't found.
 
 ## Installation
-Grab the .deb file from [releases](https://github.com/undefinederror/upk/releases). The `.deb` package automatically installs Bash completion.
+```
+pacstall -I upk-git
+```
+Alternatively grab the `.deb` file from [releases](https://github.com/undefinederror/upk/releases). 
 
 
 ### Prerequisites
@@ -94,6 +98,9 @@ upk search firefox
 # Search for packages, exact match only
 upk search firefox -e
 
+# Search without using cache (fetches fresh results and updates cache)
+upk search firefox --no-cache
+
 # Install Firefox (prompts to choose source)
 upk install firefox
 
@@ -122,8 +129,14 @@ upk upgrade
 # Upgrade a specific package
 upk upgrade firefox
 
+# Upgrade a specific package with extra backend arguments
+upk upgrade firefox -- --edge
+
 # Remove package
 upk remove firefox
+
+# Remove package with extra backend arguments
+upk remove firefox -- --purge
 
 # List all installed packages
 upk list

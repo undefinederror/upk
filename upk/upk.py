@@ -124,7 +124,8 @@ def get_backend_from_name(backend_name: str):
 @cli.command()
 @click.argument('query')
 @click.option('-e', '--exact', is_flag=True, help='Show only exact matches')
-def search(query: str, exact: bool):
+@click.option('--no-cache', is_flag=True, help='Bypass search cache')
+def search(query: str, exact: bool, no_cache: bool):
     """Search for packages across all available sources.
     
     Example:
@@ -172,7 +173,7 @@ def search(query: str, exact: bool):
             live.refresh()
             
         from .search import search_all_backends
-        results = search_all_backends(available_backends, query, update_progress)
+        results = search_all_backends(available_backends, query, update_progress, use_cache=not no_cache)
         live.update(generate_status_table())
         
     if exact:
@@ -435,18 +436,34 @@ def update():
             console.print(f"[green]Successfully updated lists for {backend.name}.[/green]")
         else:
             console.print(f"[red]Failed to update lists for {backend.name}.[/red]")
+    
+    # Invalidate search cache since repo data has changed
+    from .cache import get_cache
+    get_cache().invalidate()
+    console.print("[dim]Search cache cleared.[/dim]")
 
 
 @cli.command()
 @click.argument('package', required=False)
-def upgrade(package: str):
+@click.argument('extra_args', nargs=-1)
+def upgrade(package: str, extra_args: tuple):
     """Upgrade all packages or a specific package.
     
     If no package is specified, upgrades all installed packages system-wide.
     If a package is specified, attempts an isolated upgrade for only that target.
+    
+    Extra arguments are passed to the backend (e.g., --stable for snap).
     """
     from rich.console import Console
     console = Console()
+    
+    # Convert extra_args tuple to list
+    extra = list(extra_args)
+    
+    # Warn if extra_args provided but no package specified
+    if not package and extra:
+        console.print("[yellow]Warning: Extra arguments are only supported when upgrading a specific package. Ignoring extra arguments.[/yellow]")
+        extra = []
     
     available_backends = get_configured_backends()
         
@@ -465,7 +482,7 @@ def upgrade(package: str):
     for backend in available_backends:
         target = f"'{package}'" if package else "all packages"
         console.print(f"Upgrading {target} via [bold blue]{backend.name}[/bold blue]...")
-        success = backend.upgrade(package)
+        success = backend.upgrade(package, extra_args=extra)
         if success:
             console.print(f"[green]Successfully upgraded via {backend.name}.[/green]")
         else:
@@ -474,11 +491,18 @@ def upgrade(package: str):
 
 @cli.command()
 @click.argument('package')
-def remove(package: str):
-    """Remove a package."""
+@click.argument('extra_args', nargs=-1)
+def remove(package: str, extra_args: tuple):
+    """Remove a package.
+    
+    Extra arguments are passed to the backend (e.g., --purge for apt/snap).
+    """
     from rich.prompt import Prompt
     from rich.console import Console
     console = Console()
+    
+    # Convert extra_args tuple to list
+    extra = list(extra_args)
     
     available_backends = get_configured_backends()
         
@@ -518,7 +542,7 @@ def remove(package: str):
         chosen_pkg = sorted_results[int(choice) - 1]
         
     target_backend = get_backend_from_name(chosen_pkg.source)
-    success = target_backend.remove(chosen_pkg.name)
+    success = target_backend.remove(chosen_pkg.name, extra_args=extra)
     if success:
         console.print(f"[green]Successfully removed {chosen_pkg.name}.[/green]")
     else:

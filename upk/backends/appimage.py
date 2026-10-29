@@ -97,20 +97,6 @@ class AppImageBackend(Backend):
                             description=None,
                             installed_version=version
                         ))
-        # Fetch descriptions for installed packages using 'am -q' (fast for small lists)
-        for pkg in packages:
-            try:
-                # We can search for the exact name to get the description
-                q_result = self._run_am(["-q", pkg.name])
-                if q_result.returncode == 0:
-                    q_packages = self._parse_search_output(q_result.stdout)
-                    for q_pkg in q_packages:
-                        if q_pkg.name == pkg.name:
-                            pkg.description = q_pkg.description
-                            break
-            except Exception:
-                pass
-
         return packages
 
     def get_installed_version(self, package_name: str) -> Optional[str]:
@@ -199,7 +185,7 @@ class AppImageBackend(Backend):
         result = self._run_am(args, capture=False)
         return result.returncode == 0
 
-    def remove(self, package_name: str) -> bool:
+    def remove(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Remove an AppImage.
         - If integrated locally, removes the `.desktop` file and bin symlink.
         - Otherwise, uses 'am -r'.
@@ -259,7 +245,10 @@ class AppImageBackend(Backend):
                 self._run_am(["-f"]) 
                 return is_removed
             
-        result = self._run_am(["-r", package_name], capture=False)
+        if extra_args is None:
+            extra_args = []
+            
+        result = self._run_am(["-r"] + extra_args + [package_name], capture=False)
         # Handle cases where 'am' exits with 0 even if it failed
         # The true check is whether it was actually removed from list
         for pkg in self.list_packages():
@@ -274,12 +263,15 @@ class AppImageBackend(Backend):
         result = self._run_am(["-s"], capture=False)
         return result.returncode == 0
 
-    def upgrade(self, package_name: Optional[str] = None) -> bool:
+    def upgrade(self, package_name: Optional[str] = None, extra_args: List[str] = None) -> bool:
         """Upgrade AppImages using 'am -u'."""
         if not self.is_available():
             return False
+        
+        if extra_args is None:
+            extra_args = []
             
-        args = ["-u"]
+        args = ["-u"] + extra_args
         if package_name:
             args.append(package_name)
         else:

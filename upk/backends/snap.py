@@ -183,13 +183,16 @@ class SnapBackend(Backend):
             
         return True
 
-    def upgrade(self, package_name: Optional[str] = None) -> bool:
+    def upgrade(self, package_name: Optional[str] = None, extra_args: List[str] = None) -> bool:
         """Upgrade packages using snap."""
         if not self.is_available():
             return False
             
+        if extra_args is None:
+            extra_args = []
+            
         try:
-            cmd = ["sudo", "snap", "refresh"]
+            cmd = ["sudo", "snap", "refresh"] + extra_args
             if package_name:
                 cmd.append(package_name)
             result = subprocess.run(cmd)
@@ -199,13 +202,17 @@ class SnapBackend(Backend):
         except Exception:
             return False
 
-    def remove(self, package_name: str) -> bool:
+    def remove(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Remove a package using snap."""
         if not self.is_available():
             return False
             
+        if extra_args is None:
+            extra_args = []
+            
         try:
-            result = subprocess.run(["sudo", "snap", "remove", package_name])
+            cmd = ["sudo", "snap", "remove"] + extra_args + [package_name]
+            result = subprocess.run(cmd)
             return result.returncode == 0
         except KeyboardInterrupt:
             return False

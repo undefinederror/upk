@@ -225,18 +225,21 @@ class AptBackend(Backend):
         except Exception:
             return False
 
-    def upgrade(self, package_name: Optional[str] = None) -> bool:
+    def upgrade(self, package_name: Optional[str] = None, extra_args: List[str] = None) -> bool:
         """Upgrade packages using Nala or apt."""
+        if extra_args is None:
+            extra_args = []
+            
         if self._has_nala():
             if package_name:
-                cmd = ["sudo", "nala", "install", package_name]
+                cmd = ["sudo", "nala", "install"] + extra_args + [package_name]
             else:
-                cmd = ["sudo", "nala", "upgrade"]
+                cmd = ["sudo", "nala", "upgrade"] + extra_args
         else:
             if package_name:
-                cmd = ["sudo", "apt", "install", "--only-upgrade", "-y", package_name]
+                cmd = ["sudo", "apt", "install", "--only-upgrade", "-y"] + extra_args + [package_name]
             else:
-                cmd = ["sudo", "apt", "upgrade", "-y"]
+                cmd = ["sudo", "apt", "upgrade", "-y"] + extra_args
             
         try:
             result = subprocess.run(cmd)
@@ -246,10 +249,13 @@ class AptBackend(Backend):
         except Exception:
             return False
 
-    def remove(self, package_name: str) -> bool:
+    def remove(self, package_name: str, extra_args: List[str] = None) -> bool:
         """Remove a package using Nala or apt."""
+        if extra_args is None:
+            extra_args = []
+            
         if self._has_nala():
-            cmd = ["sudo", "nala", "remove", package_name]
+            cmd = ["sudo", "nala", "remove"] + extra_args + [package_name]
             
             # Check for history to undo
             try:
@@ -278,7 +284,7 @@ class AptBackend(Backend):
             except Exception:
                 pass
         else:
-            cmd = ["sudo", "apt", "remove", package_name]
+            cmd = ["sudo", "apt", "remove"] + extra_args + [package_name]
             
         try:
             result = subprocess.run(cmd)

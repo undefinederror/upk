@@ -4,12 +4,48 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Callable, Optional
 
 from .backends.base import Backend, PackageInfo
+from .cache import get_cache
+
+
+def _search_single_backend(
+    backend: Backend,
+    query: str,
+    use_cache: bool = True
+) -> List[PackageInfo]:
+    """
+    Search a single backend with optional caching.
+
+    Args:
+        backend: Backend instance to search
+        query: Search term
+        use_cache: Whether to read from cache (always writes if cache available)
+
+    Returns:
+        List of PackageInfo from the backend
+    """
+    cache = get_cache()
+
+    # Try cache first (unless bypassing)
+    if use_cache and cache is not None:
+        cached = cache.get(backend.name, query)
+        if cached is not None:
+            return cached
+
+    # Cache miss or bypassed — call the backend
+    results = backend.search(query)
+
+    # Always update cache with fresh results
+    if cache is not None:
+        cache.set(backend.name, query, results)
+
+    return results
 
 
 def search_all_backends(
     backends: List[Backend], 
     query: str,
-    progress_callback: Optional[Callable[[str, bool], None]] = None
+    progress_callback: Optional[Callable[[str, bool], None]] = None,
+    use_cache: bool = True
 ) -> List[PackageInfo]:
     """
     Search across all backends in parallel.
@@ -18,6 +54,7 @@ def search_all_backends(
         backends: List of backend instances to search
         query: Search term
         progress_callback: Optional callback function(backend_name, completed)
+        use_cache: Whether to use search cache
         
     Returns:
         Aggregated list of PackageInfo from all backends
@@ -28,7 +65,7 @@ def search_all_backends(
     with ThreadPoolExecutor(max_workers=len(backends)) as executor:
         # Submit all search tasks
         future_to_backend = {
-            executor.submit(backend.search, query): backend
+            executor.submit(_search_single_backend, backend, query, use_cache): backend
             for backend in backends
         }
         
